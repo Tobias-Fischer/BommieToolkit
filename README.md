@@ -1,6 +1,7 @@
 <div align="center">
     <h1>BommieToolkit</h1>
     <a href="https://github.com/BommieToolkit/BommieToolkit"><img src="https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black" /></a>
+    <a href="https://github.com/BommieToolkit/BommieToolkit"><img src="https://img.shields.io/badge/macOS%20ARM-000000?logo=apple&logoColor=white" /></a>
     <br />
 </div>
 
@@ -9,6 +10,43 @@
     ·
     <a href="https://scholar.google.com/citations?user=MNrMUPMAAAAJ&hl=en"><strong>Emilio Olivastri</strong></a>
 </p>
+
+## End-to-End Pipeline: Videos → Gaussian Splatting
+
+The full pipeline (from videos to a nerfstudio-ready `transforms.json`) can be run with a single command:
+
+```bash
+pixi run -e colmap reconstruct
+```
+
+This chains the following steps automatically (using pixi task dependencies):
+
+1. Extract frames from left & right videos
+2. Synchronise image pairs by timestamp
+3. COLMAP feature extraction
+4. COLMAP rig configuration
+5. COLMAP sequential matching
+6. COLMAP mapping
+7. COLMAP model conversion (TXT + PLY)
+8. `colmap2nerf` → `monkey_output/transforms.json`
+
+Default video paths are `videos/monkey_left.MP4` and `videos/monkey_right.MP4`.
+Override them with environment variables:
+
+```bash
+VIDEO_LEFT=path/to/left.MP4 VIDEO_RIGHT=path/to/right.MP4 RESOLUTION=high OUTPUT_DIR=my_output pixi run -e colmap reconstruct
+```
+
+| Variable | Default | Description |
+|---|---|---|
+| `VIDEO_LEFT` | `videos/monkey_left.MP4` | Path to the left camera video |
+| `VIDEO_RIGHT` | `videos/monkey_right.MP4` | Path to the right camera video |
+| `RESOLUTION` | `medium` | Frame extraction resolution (`lowest`, `low`, `medium`, `high`) |
+| `OUTPUT_DIR` | `monkey_output` | Root output directory for all pipeline artefacts |
+
+After the pipeline finishes, run nerfstudio separately (see [GS Reconstruction](#gs-reconstruction-with-nerfstudio) below).
+
+---
 
 ## Video Recording
 
@@ -76,23 +114,24 @@ pixi run get_rig_config_json calibration_output/calibration-camchain.yaml calibr
 ```
 
 ## COLMAP Reconstruction
+
+The individual COLMAP steps are available as pixi tasks in the `colmap` environment.
+Run `pixi run -e colmap reconstruct` for the full automated pipeline (see above), or execute individual steps:
+
 Extract images from videos
 
 ```bash
-pixi run extract_images --video videos/monkey_left.MP4 --output monkey_output/monkey_images_left --resolution medium
-pixi run extract_images --video videos/monkey_right.MP4 --output monkey_output/monkey_images_right --resolution medium
+pixi run -e colmap extract-left
+pixi run -e colmap extract-right
+# Override defaults with env vars: VIDEO_LEFT=... VIDEO_RIGHT=... RESOLUTION=...
 ```
 
-Synch image pairs using timestamps
+Synchronise image pairs using timestamps
 
 ```bash
-pixi run match_images_by_ns \
-  --images_folder_left monkey_output/monkey_images_left \
-  --images_folder_right monkey_output/monkey_images_right \
-  --colmap_folder_left monkey_output/colmap_images/rig1/camera1 \
-  --colmap_folder_right monkey_output/colmap_images/rig1/camera2 \
-  --threshold-ns 5000000
+pixi run -e colmap sync-images
 ```
+
 (OPTIONAL) Get masks for the images using sam3, you have to have a hugging face account and login to download the weights
 ```bash
 pixi run -e sam hf auth login
@@ -103,45 +142,15 @@ To access the app click navigate on the following link:
 http://0.0.0.0:7997
 ```
 
-
-Execute COLMAP
-```bash
-pixi run -e colmap colmap feature_extractor \
-  --image_path monkey_output/colmap_images \
-  --database_path monkey_output/database.db \
-  --ImageReader.single_camera 1 \
-  --ImageReader.single_camera_per_folder 1 \
-  --ImageReader.single_camera_per_image 0
-```
+Execute COLMAP steps individually
 
 ```bash
-pixi run -e colmap colmap rig_configurator \
-  --database_path monkey_output/database.db \
-  --rig_config_path calibration_output/rig_config.json
-```
-
-```bash
-pixi run -e colmap colmap sequential_matcher --database_path monkey_output/database.db
-```
-
-```bash
-mkdir -p monkey_output/sparse
-pixi run -e colmap colmap mapper \
-  --database_path monkey_output/database.db  \
-  #--Mapper.ba_refine_sensor_from_rig 0 \
-  --Mapper.ba_refine_focal_length 0 \
-  --Mapper.ba_refine_extra_params 0 \
-  --image_path monkey_output/colmap_images \
-  --output_path monkey_output/sparse \
-  --Mapper.ba_use_gpu 1
-
-pixi run -e colmap colmap mapper \
-  --database_path monkey_output/database.db  \
-  --Mapper.ba_refine_focal_length 0 \
-  --Mapper.ba_refine_extra_params 0 \
-  --image_path monkey_output/colmap_images \
-  --output_path monkey_output/sparse \
-  --Mapper.ba_use_gpu 1
+pixi run -e colmap feature-extractor
+pixi run -e colmap rig-configurator
+pixi run -e colmap sequential-matcher
+pixi run -e colmap mapper
+pixi run -e colmap model-converter-txt
+pixi run -e colmap model-converter-ply
 ```
 
 Visualize reconstruction
@@ -152,23 +161,10 @@ pixi run -e colmap colmap gui \
   --import_path monkey_output/sparse/0
 ```
 
-Get COLMAP output
-```bash
-pixi run -e colmap colmap model_converter \
-	--input_path monkey_output/sparse/0 \
-    --output_path monkey_output/sparse/0 \
-    --output_type TXT
-```
+Convert COLMAP output for nerfstudio
 
 ```bash
-pixi run -e colmap colmap model_converter \
-	--input_path monkey_output/sparse/0 \
-    --output_path monkey_output/sparse/0/mesh.ply \
-    --output_type PLY
-```
-
-```bash
-pixi run colmap2nerf --text sparse/0 --images colmap_images --out transforms.json --keep_colmap_coords
+pixi run -e colmap to-nerf
 ```
 
 ## GS Reconstruction with nerfstudio
@@ -193,7 +189,7 @@ ns-viewer --load-config outputs/monkey_output/splatfacto/2025-11-19_105617/confi
 ## BommieToolkit Roadmap
 
 - [ ] Make Kalibr a Conda package
-- [ ] Implement one end-to-end command, from videos to GS.
+- [x] Implement one end-to-end command, from videos to GS.
 - [ ] Documentation for the intermediate outputs
 - [ ] Documentation on recording calibration/reconstruction data
 - [ ] Documentation on gopro settings

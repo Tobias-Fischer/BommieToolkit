@@ -2,13 +2,13 @@
 authors = ["alejandrofontan <fontanvillacampa@gmail.com>", "EmilioOlivastri <emilito.olivastri@gmail.com>"]
 channels = ["conda-forge"]
 name = "BommieToolkit"
-platforms = ["linux-64"]
+platforms = ["linux-64", "osx-arm64"]
 version = "0.1.0"
 
 [tasks]
 extract_images = "python scripts/vid2imgs.py"
 match_images_by_ns = "python scripts/match_images_by_ns.py"
-get_rig_config_json= "python scripts/convert_camchain_to_rig_config.py"
+get_rig_config_json = "python scripts/convert_camchain_to_rig_config.py"
 colmap2nerf = { cmd = "python ../scripts/colmap2nerf.py", cwd = "monkey_output" }
 extract_images_dev = "python scripts/vid2imgs_dev.py"
 
@@ -17,10 +17,11 @@ python = "*"
 opencv = "*"
 tqdm = "*"
 pyyaml = "*"
+ffmpeg = "*"
 
 [environments]
 kalibr = {features = ["kalibr"], no-default-feature = true}
-colmap = {features = ["colmap"], no-default-feature = true}
+colmap = {features = ["colmap"]}
 sam = {features = ["sam"], no-default-feature = true}
 
 ########################################################################################################################
@@ -75,10 +76,7 @@ igraph="*"
 # sam feature
 [feature.sam]
 channels = ["https://prefix.dev/conda-forge"]
-platforms = ["linux-64"]
-
-[feature.sam.system-requirements]
-cuda = "12.6"
+platforms = ["linux-64", "osx-arm64"]
 
 [feature.sam.tasks]
 create_masks = {cmd = "python sam3_gradio_app.py", cwd="scripts"}
@@ -91,44 +89,17 @@ sam3 = { git = "https://github.com/BommieToolkit/sam3_bommie" }
 decord = ">=0.6.0, <0.7"
 
 [feature.sam.dependencies]
-# Core Python + GPU
+# Core Python
 python = "3.12.*"
 pip = "*"
-setuptools="80.*"
-pkg-config="*"
-pytorch-gpu = "*"
+setuptools = "80.*"
+pkg-config = "*"
 torchvision = "*"
 numpy = "1.26.*"
 scipy = "1.16.*"
 pandas = "2.3.*"
 opencv = "*"              # image processing
 typing_extensions = "*"
-
-# CUDA
-# CUDA Build Tools
-cuda-compiler = "*"
-cuda-version = "12.6.*"
-cuda-cudart-dev = "*"
-cuda-crt = "*"
-libcusparse-dev = "*"
-cuda-driver-dev = "*"
-cuda-nvcc = "*"
-cuda-nvrtc-dev = "*"
-cuda-nvtx = "*"
-cuda-nvtx-dev = "*"
-cuda-nvml-dev = "*"
-cuda-profiler-api = "*"
-
-# CUDA Libraries
-cudnn = "*"
-libcublas-dev = "*"
-libcudss-dev = "*"
-libcufile-dev = "*"
-libcufft-dev = "*"
-libcurand-dev = "*"
-libcusolver-dev = "*"
-cusparselt = "*"
-libnvjitlink = "*"
 
 # Utilities
 ffmpeg = "*"              # video handling
@@ -143,17 +114,81 @@ einops = ">=0.8.2,<0.9"
 pycocotools = ">=2.0.11,<3"
 psutil = ">=7.2.2,<8"
 
+# Linux: CUDA GPU support
+[feature.sam.target.linux-64.system-requirements]
+cuda = "12.6"
+
+[feature.sam.target.linux-64.dependencies]
+pytorch-gpu = "*"
+# CUDA Build Tools
+cuda-compiler = "*"
+cuda-version = "12.6.*"
+cuda-cudart-dev = "*"
+cuda-crt = "*"
+libcusparse-dev = "*"
+cuda-driver-dev = "*"
+cuda-nvcc = "*"
+cuda-nvrtc-dev = "*"
+cuda-nvtx = "*"
+cuda-nvtx-dev = "*"
+cuda-nvml-dev = "*"
+cuda-profiler-api = "*"
+# CUDA Libraries
+cudnn = "*"
+libcublas-dev = "*"
+libcudss-dev = "*"
+libcufile-dev = "*"
+libcufft-dev = "*"
+libcurand-dev = "*"
+libcusolver-dev = "*"
+cusparselt = "*"
+libnvjitlink = "*"
+
+# macOS ARM: Metal (MPS) via standard PyTorch
+[feature.sam.target.osx-arm64.dependencies]
+pytorch = "*"
+
 ########################################################################################################################
 ########################################################################################################################
 # colmap feature
 [feature.colmap]
 channels = ["https://prefix.dev/conda-forge"]
-platforms = ["linux-64"]
+platforms = ["linux-64", "osx-arm64"]
 
-[feature.colmap.system-requirements]
+[feature.colmap.target.linux-64.system-requirements]
 cuda = "12.6"
 
-[feature.colmap.tasks]
+[feature.colmap.target.linux-64.dependencies]
+colmap = { build = "*cuda*", version = "==3.11.1" }
 
-[feature.colmap.dependencies]
-colmap = { build="*cuda*", version = "==3.11.1" }
+[feature.colmap.target.osx-arm64.dependencies]
+colmap = { version = "==3.11.1" }
+
+[feature.colmap.tasks]
+# ── Image extraction ──────────────────────────────────────────────────────────
+extract-left = "python scripts/vid2imgs.py --video ${VIDEO_LEFT:-videos/monkey_left.MP4} --output ${OUTPUT_DIR:-monkey_output}/monkey_images_left --resolution ${RESOLUTION:-medium}"
+extract-right = "python scripts/vid2imgs.py --video ${VIDEO_RIGHT:-videos/monkey_right.MP4} --output ${OUTPUT_DIR:-monkey_output}/monkey_images_right --resolution ${RESOLUTION:-medium}"
+
+# ── Timestamp-based image sync ────────────────────────────────────────────────
+sync-images = { cmd = "python scripts/match_images_by_ns.py --images_folder_left ${OUTPUT_DIR:-monkey_output}/monkey_images_left --images_folder_right ${OUTPUT_DIR:-monkey_output}/monkey_images_right --colmap_folder_left ${OUTPUT_DIR:-monkey_output}/colmap_images/rig1/camera1 --colmap_folder_right ${OUTPUT_DIR:-monkey_output}/colmap_images/rig1/camera2 --threshold-ns 5000000", depends-on = ["extract-left", "extract-right"] }
+
+# ── COLMAP reconstruction ─────────────────────────────────────────────────────
+feature-extractor = { cmd = "colmap feature_extractor --image_path ${OUTPUT_DIR:-monkey_output}/colmap_images --database_path ${OUTPUT_DIR:-monkey_output}/database.db --ImageReader.single_camera 1 --ImageReader.single_camera_per_folder 1 --ImageReader.single_camera_per_image 0", depends-on = ["sync-images"] }
+
+rig-configurator = { cmd = "colmap rig_configurator --database_path ${OUTPUT_DIR:-monkey_output}/database.db --rig_config_path calibration_output/rig_config.json", depends-on = ["feature-extractor"] }
+
+sequential-matcher = { cmd = "colmap sequential_matcher --database_path ${OUTPUT_DIR:-monkey_output}/database.db", depends-on = ["rig-configurator"] }
+
+mkdir-sparse = "mkdir -p ${OUTPUT_DIR:-monkey_output}/sparse"
+
+mapper = { cmd = "colmap mapper --database_path ${OUTPUT_DIR:-monkey_output}/database.db --Mapper.ba_refine_focal_length 0 --Mapper.ba_refine_extra_params 0 --image_path ${OUTPUT_DIR:-monkey_output}/colmap_images --output_path ${OUTPUT_DIR:-monkey_output}/sparse", depends-on = ["sequential-matcher", "mkdir-sparse"] }
+
+model-converter-txt = { cmd = "colmap model_converter --input_path ${OUTPUT_DIR:-monkey_output}/sparse/0 --output_path ${OUTPUT_DIR:-monkey_output}/sparse/0 --output_type TXT", depends-on = ["mapper"] }
+
+model-converter-ply = { cmd = "colmap model_converter --input_path ${OUTPUT_DIR:-monkey_output}/sparse/0 --output_path ${OUTPUT_DIR:-monkey_output}/sparse/0/mesh.ply --output_type PLY", depends-on = ["mapper"] }
+
+# ── colmap2nerf ───────────────────────────────────────────────────────────────
+to-nerf = { cmd = "python scripts/colmap2nerf.py --text ${OUTPUT_DIR:-monkey_output}/sparse/0 --images ${OUTPUT_DIR:-monkey_output}/colmap_images --out ${OUTPUT_DIR:-monkey_output}/transforms.json --keep_colmap_coords", depends-on = ["model-converter-txt"] }
+
+# ── End-to-end pipeline: videos → transforms.json (nerfstudio-ready) ──────────
+reconstruct = { depends-on = ["to-nerf", "model-converter-ply"] }
