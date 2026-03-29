@@ -28,8 +28,8 @@ sam = {features = ["sam"], no-default-feature = true}
 ########################################################################################################################
 # kalibr feature
 [feature.kalibr]
-channels = ["https://fast.prefix.dev/conda-forge", "esrf-bcu", "robostack-staging"]
-platforms = ["linux-64"]
+channels = ["https://fast.prefix.dev/conda-forge", "esrf-bcu", "robostack-staging", "robostack-noetic"]
+platforms = ["linux-64", "osx-arm64"]
 
 [feature.kalibr.tasks]
 create_catkin_ws = "mkdir -p catkin_ws/src && cd catkin_ws && catkin init"
@@ -38,7 +38,7 @@ build = {cmd = "catkin build -j8 --cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE
 kalibr-calibrate-stereo-rig = {cmd = "./scripts/calibrate_stereo_rig.sh"}
 
 [feature.kalibr.dependencies]
-python = {version="3.9.18", build="h0755675_0_cpython", channel="https://fast.prefix.dev/conda-forge"}
+python = "3.9.*"
 ros-noetic-desktop="*"
 compilers="*"
 cmake="*"
@@ -49,15 +49,12 @@ colcon-common-extensions="*"
 catkin_tools="*"
 rosdep="*"
 boost="*"
-suitesparse = {version="5.4.0", build="h717dc36_0", channel="https://fast.prefix.dev/conda-forge"}
 tbb="*"
 opencv="*"
-libv4l="*"
 pip="*"
 scipy="*"
 matplotlib="*"
 ipython="*"
-wxpython ="*"
 tk ="*"
 pyx="*"
 libtiff="*"
@@ -67,6 +64,17 @@ pillow = "*"
 ffmpeg-python = "*"
 ffmpeg = "*"
 exiftool = "*"
+
+# Linux-specific build pins and packages
+[feature.kalibr.target.linux-64.dependencies]
+python = {version="3.9.18", build="h0755675_0_cpython", channel="https://fast.prefix.dev/conda-forge"}
+suitesparse = {version="5.4.0", build="h717dc36_0", channel="https://fast.prefix.dev/conda-forge"}
+libv4l="*"
+wxpython ="*"
+
+# macOS ARM: no build-hash pin needed for suitesparse
+[feature.kalibr.target.osx-arm64.dependencies]
+suitesparse = "5.4.*"
 
 [feature.kalibr.pypi-dependencies]
 igraph="*"
