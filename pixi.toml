@@ -67,14 +67,14 @@ exiftool = "*"
 
 # Linux-specific build pins and packages
 [feature.kalibr.target.linux-64.dependencies]
-python = {version="3.9.18", build="h0755675_0_cpython", channel="https://fast.prefix.dev/conda-forge"}
-suitesparse = {version="5.4.0", build="h717dc36_0", channel="https://fast.prefix.dev/conda-forge"}
+python = {version="==3.9.18", build="h0755675_0_cpython", channel="https://fast.prefix.dev/conda-forge"}
+suitesparse = {version="==5.4.0", build="h717dc36_0", channel="https://fast.prefix.dev/conda-forge"}
 libv4l="*"
 wxpython ="*"
 
 # macOS ARM: no build-hash pin needed for suitesparse
 [feature.kalibr.target.osx-arm64.dependencies]
-suitesparse = "5.4.*"
+suitesparse = "7.*"
 
 [feature.kalibr.pypi-dependencies]
 igraph="*"
