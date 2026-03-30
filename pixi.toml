@@ -38,7 +38,7 @@ build = {cmd = "catkin build -j8 --cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE
 kalibr-calibrate-stereo-rig = {cmd = "./scripts/calibrate_stereo_rig.sh"}
 
 [feature.kalibr.dependencies]
-python = "3.9.*"
+python = "3.12.*"
 ros-noetic-desktop="*"
 compilers="*"
 cmake="*"
@@ -64,17 +64,12 @@ pillow = "*"
 ffmpeg-python = "*"
 ffmpeg = "*"
 exiftool = "*"
-wxpython ="*"
+wxpython = "*"
+suitesparse = "*"
 
 # Linux-specific build pins and packages
 [feature.kalibr.target.linux-64.dependencies]
-python = {version="==3.9.18", build="h0755675_0_cpython", channel="https://fast.prefix.dev/conda-forge"}
-suitesparse = {version="==5.4.0", build="h717dc36_0", channel="https://fast.prefix.dev/conda-forge"}
 libv4l="*"
-
-# macOS ARM: no build-hash pin needed for suitesparse
-[feature.kalibr.target.osx-arm64.dependencies]
-suitesparse = "7.*"
 
 [feature.kalibr.pypi-dependencies]
 igraph="*"
