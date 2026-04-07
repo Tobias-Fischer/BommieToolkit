@@ -90,9 +90,6 @@ no-build-isolation = true
 [feature.sam.pypi-dependencies]
 sam3 = { git = "https://github.com/BommieToolkit/sam3_bommie" }
 
-[feature.sam.target.linux-64.pypi-dependencies]
-decord = ">=0.6.0, <0.7"
-
 [feature.sam.dependencies]
 # Core Python
 python = "3.12.*"
@@ -118,6 +115,7 @@ gradio = "*"
 einops = ">=0.8.2,<0.9"
 pycocotools = ">=2.0.11,<3"
 psutil = ">=7.2.2,<8"
+decord = "*"
 
 # Linux: CUDA GPU support
 [feature.sam.system-requirements]
